@@ -8,6 +8,24 @@ router.get('/', async (req, res) => {
     res.send(readings)
 })
 
+router.get('/get-energy-apartments', async(req,res) => {
+    const date = await service.getReadinsgByApartment(req.query.date);
+    if( !date )
+        res.status(404).json('insert a date')
+    else
+        res.send(date)
+})
+
+router.get('/get-energy', async(req,res) => {
+    const date = await service.getReadinsgByDate(req.query.date);
+    if( !date )
+        res.status(404).json('insert a date')
+    else
+        res.send(date)
+})
+
+
+
 router.get('/:id', async (req,res) => {
     const reading = await service.getReadingByMeterId(req.params.id)
     if( reading == 0)
@@ -15,5 +33,7 @@ router.get('/:id', async (req,res) => {
     else
         res.send(reading)
 })
+
+
 
 module.exports = router;

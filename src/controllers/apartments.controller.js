@@ -24,8 +24,8 @@ router.get('/:id/get-energy', async (req, res) => {
     const energy = await service.getAparmentEnergy(apartmentId, startDate, endDate);
     console.log(energy)
 
-
-    if (Object.keys(energy.energyTotal).length == 0) {
+    res.send(energy)
+/*     if (Object.keys(energy.energyTotal).length == 0) {
         res.status(404).json('Error, no se encontro ninguna lectura');
     } else if (Object.keys(energy.energyTotal).length == 1){
         res.status(404).json('Error, no se solo 1 lectura');
@@ -33,7 +33,7 @@ router.get('/:id/get-energy', async (req, res) => {
         res.status(404).json('Error, alguno de los medidores no envío la cantidad de energía')
     } else {
         res.send(energy);
-    }
+    } */
 });
 
 

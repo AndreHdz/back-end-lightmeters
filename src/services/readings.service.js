@@ -94,7 +94,7 @@ module.exports.getReadinsgByApartment = async (date) => {
         apartment.total_energy = parseFloat(apartment.total_energy.toFixed(2));
     }
 
-    apartments.sort((a,b) => b.total_energy - a.total_energy);
+    apartments.sort((a,b) => b.total_energy - a.total_energy)
 
 
     return apartments;

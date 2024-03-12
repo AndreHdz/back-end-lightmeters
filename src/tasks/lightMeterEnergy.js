@@ -1,6 +1,5 @@
 const cron = require("node-cron");
-const { DOMParser } = require('xmldom');
-const db = require("../db");
+const mysql = require('mysql2/promise');
 const db2 = require("../db2");
 const date = require("../lib/date");
 const ping =  require("ping");
@@ -15,70 +14,94 @@ async function doPing(ip) {
     }
 }
 
+
+
 // Define la tarea cron para ejecutar a las 6 PM todos los días
-cron.schedule("*/30 * * * * *", async () => {
+cron.schedule("*/5 * * * *", async () => {
     const formattedDate = date();
-	console.log(formattedDate)
-	
-    try {
-        const [records] = await db.query(
-            `
-            SELECT energya AS energy, 
-                    last_readings.meter_registration_date AS registration_date, 
-                    serial_number 
-            FROM last_readings  
-            INNER JOIN meter ON last_readings.meter_id = meter.id
-            WHERE DATE(last_readings.meter_registration_date) = "${formattedDate}" AND EXTRACT(HOUR FROM last_readings.meter_registration_date) = 12`
-        );
+    const [ips] = await db2.query("SELECT ip, cabinet_number FROM cabinets");
 
-        if (records.length > 0) {	
-			for (let i = 0; i < records.length; i++) {
-				const serialNumber = records[i].serial_number;
-				const result = await db2.query(`SELECT id FROM lightmeters WHERE serial_number = "${serialNumber}"`);
+    for(let i = 0; i < ips.length; i++){
+        let ip = ips[i].ip;
+        let cabinetNumber = ips[i].cabinet_number
 
-				if (result && result[0] && result[0][0] && result[0][0].id) {
-					records[i] = { meter_id: result[0][0].id, ...records[i] };
 
-					// Realizar la inserción solo si se obtuvo un valor para 'id'
-					const results = await db2.query(`
-						INSERT INTO readings (meter_id, energy, registration_date, meter_sn)
-						VALUES (?, ?, ?, ?)
-					`, [records[i].meter_id, records[i].energy, records[i].registration_date, records[i].serial_number]);
-					
-					console.log(`${[i]}.- Intento de inserción para el medidor con número de serie '${records[i].serial_number}' y energía ${records[i].energy}.`);
+        const db = mysql.createPool({
+            host: ip,
+            user: 'root',
+            password: '',
+            database : 'ebox_apolo'
+        })
 
-					
-				} else {
-					console.error(`No se encontró el 'id' para el número de serie '${serialNumber}'.`);
-				}
-			}
-            
-        } else {
-            console.log("No hay datos");
-        }
-		
-		} catch (error) {
-			if (error.code === 'ER_DUP_ENTRY'){
-				console.error(`Duplicated reg for '${serialNumber}'`)
-			} else {
-				console.error("Error en la tarea cron:", error);
-			}
-		}
+        try {
+            const [records] = await db.query(
+                `
+                SELECT energya AS energy, 
+                        last_readings.meter_registration_date AS registration_date, 
+                        serial_number 
+                FROM last_readings  
+                INNER JOIN meter ON last_readings.meter_id = meter.id
+                WHERE DATE(last_readings.meter_registration_date) = "${formattedDate}" AND EXTRACT(HOUR FROM last_readings.meter_registration_date) = 12`
+            );
+                if (records.length > 0) {	
+                    for (let j = 0; j < records.length; j++) {
+                        const serialNumber = records[j].serial_number;
+                        const result = await db2.query(`SELECT id FROM lightmeters WHERE serial_number = "${serialNumber}"`);
+    
+                        if (result && result[0] && result[0][0] && result[0][0].id) {
+                            records[j] = { meter_id: result[0][0].id, ...records[j] };
+    
+                            // Realizar la inserción solo si se obtuvo un valor para 'id'
+                            const results = await db2.query(`
+                                INSERT INTO readings (meter_id, energy, registration_date, meter_sn)
+                                VALUES (?, ?, ?, ?)
+                            `, [records[j].meter_id, records[j].energy, records[j].registration_date, records[j].serial_number]);
+                            
+                            console.log(`${[j]}.- Intento de inserción para el medidor con número de serie '${records[j].serial_number}' y energía ${records[j].energy}.`);
+    
+                            
+                        } else {
+                            console.error(`No se encontró el 'id' para el número de serie '${serialNumber}'.`);
+                        }
+                    }
+                    
+                } else {
+                    console.log(`No hay datos para el Gabinete:${cabinetNumber} con la ip:${ip}`);
+                }
+            } catch (error) {
+                if (error.code === 'ER_DUP_ENTRY'){
+                    console.error(`Duplicated reg for '${serialNumber}'`)
+                } else if(error.code === 'ETIMEDOUT'){
+                    console.error(`No hay conexión para la ip ${ip}`)
+                } else {
+                    console.error("Error en la tarea cron:", error);
+                }
+            }
+    }
 });
 
 
-//Actualizar estado de Medidores de Luz
-cron.schedule("*/30 * * * * *", async () => {
+
+//Actualizar status de medidor
+cron.schedule("*/15 * * * *", async () => {
     const formattedDate = date();
-    console.log(formattedDate);
 
     try {
+        // Primero, actualizar todos los medidores a estado 0
+        await db2.query(
+            `
+            UPDATE lightmeters
+            SET status = 0`
+        );
+
+        // Luego, obtener los registros para la fecha especificada
         const [records] = await db2.query(
             `
             SELECT meter_id, registration_date
             FROM readings
             WHERE DATE(registration_date) = "${formattedDate}" `
         );
+
         // Actualizar el campo status para los registros obtenidos
         if (records && records.length > 0) {
             const updatePromises = records.map(async (record) => {
@@ -93,34 +116,60 @@ cron.schedule("*/30 * * * * *", async () => {
             await Promise.all(updatePromises);
             console.log('Registros actualizados correctamente.');
         } else {
-            console.log('No hay registros para actualizar.');
+            console.log('No hay registros para actualizar. Todos los medidores se han establecido en estado 0.');
         }
     } catch (error) {
         console.error("Error en la tarea cron:", error);
     }
 });
 
-cron.schedule("*/55 * * * * *", async () => {
+//Tarea que hace PING y actualiza estado en BD
+
+cron.schedule("*/5 * * * *", async () => {
     try{
         const [ips] = await db2.query(
             `SELECT ip FROM cabinets`   
         )
         for(const {ip} of ips){
             const isAlive = await doPing(ip);
-            console.log(`IP ${ip} está ${isAlive ? 'activa' : 'inactiva'}`);
+            // console.log(`IP ${ip} está ${isAlive ? 'activa' : 'inactiva'}`);
             await db2.query(
                 `UPDATE cabinets SET status = ? WHERE ip = ?`,
                 [isAlive ? 1 : 0, ip]
             )
         }
-        console.log(ips)
     } catch (error){
         console.log(error)
     }
 });
 
 
-(async () => {
+//Crear Invoices
+
+/* ( async () => {
+    const startDate = "2024/02/01";
+    const endDate = "2024/02/28";
+    try{
+        const [apartments] = await db2.query(`SELECT * FROM apartments`);
+        let error = 0;
+        for(let i = 0; i < apartments.length; i++){
+            const apartment = apartments[i];
+            const energyObjetct = await serviceApartment.getAparmentEnergy(apartment.id, startDate, endDate)
+            if(energyObjetct.energy.total){
+                await db2.query(`INSERT INTO invoices (apartment_id, energy, start_date, end_date) VALUES (?, ?, ?, ?)`,[energyObjetct.apartmentInfo[0].id, energyObjetct.energy.total, startDate, endDate])
+            } else {
+                error++
+                console.log(`${error}-No se econtro energia para Departamento: ${apartment.apartment_number}`)
+            }
+        }
+    }catch(error){
+        console.log(error)
+    }
+})(); */
+
+
+//Extraer DATOS XML
+/* (async () => {
     try {
         const [records] = await db.query("SELECT registration_date, xml_data from message_pending_to_send");
 
@@ -167,5 +216,5 @@ cron.schedule("*/55 * * * * *", async () => {
     } catch (error) {
         console.error("Error en la tarea:", error)
     }
-})();
+})(); */
 

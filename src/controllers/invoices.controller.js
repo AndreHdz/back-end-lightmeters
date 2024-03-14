@@ -1,13 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const PDFDocument = require('pdfkit')
 const generatePDF = require('../lib/generatePDF')
+const serviceInvoices = require('../services/invoices.service')
 const service = require('../services/aparments.service');
 const serviceOptions = require('../services/options.service')
 const db = require('../db2')
 
 
-
+router.get('/', async(req,res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const invoices = await serviceInvoices.getInvoices(page, limit);
+    res.send({page: page, limit: limit, data: invoices.data, totalResults: invoices.totalRows})    
+});
 
 router.get('/:id', async (req, res) => {
     const invoiceId = req.params.id;
@@ -16,7 +21,7 @@ router.get('/:id', async (req, res) => {
 
     
     try {
-        const apartment = await service.getAparmentById(invoice[0].id)
+        const apartment = await service.getAparmentById(invoice[0].apartment_id)
         const iva = await serviceOptions.getOption('iva');
         const energyPrice = await serviceOptions.getOption('energy_price');
         const fixedCharge = await serviceOptions.getOption('fixed_charge');

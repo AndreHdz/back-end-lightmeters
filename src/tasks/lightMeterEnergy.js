@@ -1,3 +1,4 @@
+require('dotenv/config')
 const cron = require("node-cron");
 const mysql = require('mysql2/promise');
 const db2 = require("../db2");
@@ -15,22 +16,26 @@ async function doPing(ip) {
 }
 
 
-
 // Define la tarea cron para ejecutar a las 6 PM todos los días
 cron.schedule("*/5 * * * *", async () => {
     const formattedDate = date();
     const [ips] = await db2.query("SELECT ip, cabinet_number FROM cabinets");
 
+    const USER = process.env.REMOTE_DB_USER;
+    const NAME = process.env.REMOTE_DB_NAME;
+    const PASSWORD = process.env.REMOTE_DB_PASSWORD;
+    const PORT = process.env.REMOTE_DB_PORT;
+
+
     for(let i = 0; i < ips.length; i++){
         let ip = ips[i].ip;
         let cabinetNumber = ips[i].cabinet_number
-
-
         const db = mysql.createPool({
             host: ip,
-            user: 'root',
-            password: '',
-            database : 'ebox_apolo'
+            user: USER,
+            password: PASSWORD,
+            database : NAME,
+            port: PORT 
         })
 
         try {
@@ -71,7 +76,7 @@ cron.schedule("*/5 * * * *", async () => {
             } catch (error) {
                 if (error.code === 'ER_DUP_ENTRY'){
                     console.error(`Duplicated reg for '${serialNumber}'`)
-                } else if(error.code === 'ETIMEDOUT'){
+                } else if(error.code === 'ETIMEDOUT' || error.code === 'EHOSTUNREACH'){
                     console.error(`No hay conexión para la ip ${ip}`)
                 } else {
                     console.error("Error en la tarea cron:", error);
@@ -83,9 +88,9 @@ cron.schedule("*/5 * * * *", async () => {
 
 
 //Actualizar status de medidor
-cron.schedule("*/15 * * * *", async () => {
+cron.schedule("*/10 * * * * *", async () => {
     const formattedDate = date();
-
+    console.log(formattedDate);
     try {
         // Primero, actualizar todos los medidores a estado 0
         await db2.query(

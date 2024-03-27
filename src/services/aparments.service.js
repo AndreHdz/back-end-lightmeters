@@ -59,7 +59,7 @@ module.exports.getAparmentEnergy = async (id, startDate, endDate) => {
             });
         }
 
-        return {total: parseFloat(totalEnergy.toFixed(2)), data: energy};
+        return {total: parseFloat(totalEnergy.toFixed(2)), startDate: startDate, endDate: endDate, data: energy};
     }
     
     return {apartmentInfo: await getApartmentInfo(id), lightmeters: await getLightmeters(id), energy : await calculateEnergy(await getLightmeters(id))}

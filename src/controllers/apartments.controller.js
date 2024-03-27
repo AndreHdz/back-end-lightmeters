@@ -23,7 +23,6 @@ router.get('/:id/get-energy', async (req, res) => {
     const endDate = req.query.endDate;
     const energy = await service.getAparmentEnergy(apartmentId, startDate, endDate);
     console.log(energy)
-
     res.send(energy)
 /*     if (Object.keys(energy.energyTotal).length == 0) {
         res.status(404).json('Error, no se encontro ninguna lectura');

@@ -10,6 +10,7 @@ function generateHr(doc, y) {
         .lineTo(395, y)
         .stroke();
 }
+
 function formatDate(date) {
     const day = date.getDate();
     const month = date.getMonth() + 1;
@@ -22,12 +23,19 @@ function invoiceDate(date){
     const año = fecha.getFullYear();
     const mes = (fecha.getMonth() + 1).toString().padStart(2, '0');
     const día = fecha.getDate().toString().padStart(2, '0');
-
     return fechaFormateada = `${año}-${mes}-${día}`;
 }
 
+function formatPeriodo(date) {
+    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const fecha = new Date(date);
+    const mes = meses[fecha.getMonth()];
+    const anio = fecha.getFullYear();
+    return mes + " " + anio;
+}
+
 function formatCurrency(cents) {
-    return "$" + (cents/1).toFixed(2);
+    return "$" + (cents / 1).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
 }
 
 function generateTableRow(
@@ -69,31 +77,36 @@ async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, sta
         .fillColor("#000000")
         .fontSize(10)
         .font("Helvetica-Bold")
-        .text("Febronio Uribe 171", 200, 35, { align: "right" })
+        .text("Condóminio Harbor 171, Torre Sur", 200, 35, { align: "right" })
         .font("Helvetica-Bold")
-        .text("Zona Hotelera, Las Glorias", 200, 50, { align: "right" })
+        .text("Febronio Uribe 171", 200, 50, { align: "right" })
         .font("Helvetica-Bold")
-        .text("Puerto Vallarta, Jalisco.", 200, 65, { align: "right" })
+        .text("Zona Hotelera Norte, Las Glorias, C.P.48333", 100, 65, { align: "right" })
+        .font("Helvetica-Bold")
+        .text("Puerto Vallarta, Jalisco, MX.", 200, 80, { align: "right" })
         .moveDown();
 
     //Información del Departamento
     doc
         .fillColor("#000000")
         .fontSize(14)
-        .text("Recibo de Lúz", 20, 110);
+        .text("Consumo de energía", 20, 110);
 
     generateHr(doc, 135);
 
     const customerInformationTop = 150;
+
+    const today = new Date()
 
     doc
         .fontSize(10)
         .text(`Recibo #${id}`, 20, customerInformationTop)
         .font("Helvetica-Bold")
         .font("Helvetica")
-        .text(`Periodo: ${invoiceDate(startDate)} - ${invoiceDate(endDate)}`, 20, customerInformationTop + 15)
-        .text(`Energía consumida: ${energy} kw`, 20, customerInformationTop + 30)
-
+        .text(`Fecha: ${invoiceDate(today)}`, 20, customerInformationTop + 15)
+        .font("Helvetica")
+        .text(`Periodo: ${invoiceDate(startDate)} - ${invoiceDate(endDate)}`, 20, customerInformationTop + 30)
+        .text(`Energía consumida: ${energy} kw`, 20, customerInformationTop + 45)
         .font("Helvetica-Bold")
         .text(apartment.record[0].apartment_owner, 250, customerInformationTop)
         .font("Helvetica")
@@ -104,7 +117,7 @@ async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, sta
         )
         .moveDown();
 
-    generateHr(doc, 200);
+    generateHr(doc, 217);
 
     //Cargos
     let i;

@@ -19,10 +19,8 @@ const db = require('../db2')
 
 module.exports.getInvoices = async (page, limit) => {
     const offset = (page - 1) * limit;
-    console.log
-    const [rows] = await db.query("SELECT * FROM invoices LIMIT ? OFFSET ?;", [limit, offset])
+    const [rows] = await db.query("SELECT * FROM invoices ORDER BY id DESC LIMIT ? OFFSET ?;", [limit, offset])
     const [countQuery] = await db.query("SELECT COUNT (*) AS total FROM invoices");
-    
     const totalCount = countQuery[0].total;
 
     for(let i = 0; i < rows.length; i++){
@@ -36,4 +34,9 @@ module.exports.getInvoices = async (page, limit) => {
         }
     }
     return {data: rows, totalRows: totalCount}
+}
+
+module.exports.insertInvoices = async (data) => {
+    const [{affectedRows}] = await db.query('INSERT INTO invoices (apartment_id, energy, start_date, end_date) VALUES (?,?,?,?)',[data.apartment_id, data.energy, data.start_date, data.end_date])
+    return affectedRows;
 }

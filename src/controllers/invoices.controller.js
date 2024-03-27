@@ -6,6 +6,8 @@ const service = require('../services/aparments.service');
 const serviceOptions = require('../services/options.service')
 const db = require('../db2')
 
+const formatPeriod = require('../lib/formatPeriod')
+
 
 router.get('/', async(req,res) => {
     const page = parseInt(req.query.page) || 1;
@@ -13,6 +15,13 @@ router.get('/', async(req,res) => {
     const invoices = await serviceInvoices.getInvoices(page, limit);
     res.send({page: page, limit: limit, data: invoices.data, totalResults: invoices.totalRows})    
 });
+
+router.post('/', async(req,res) => {
+    console.log(req.body)
+    const affectedRows =  await serviceInvoices.insertInvoices(req.body);
+    res.status(201).send('invoice created successfully')
+})
+
 
 router.get('/:id', async (req, res) => {
     const invoiceId = req.params.id;
@@ -27,7 +36,8 @@ router.get('/:id', async (req, res) => {
         const fixedCharge = await serviceOptions.getOption('fixed_charge');
         const doc = await generatePDF(apartment,iva,energyPrice,fixedCharge,invoice[0].energy, invoice[0].start_date, invoice[0].end_date, invoice[0].id); 
 
-        const filename = `Factura ${Date.now()}.pdf`;
+        const filename = `ENERGÍA A CUENTA DE CONDÓMINIO - ${apartment.record[0].apartment_number} - ${formatPeriod(invoice[0].start_date)}.pdf`;
+        console.log(apartment)
 
         const stream = res.writeHead(200, {
             'Content-Type': 'application/pdf',

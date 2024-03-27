@@ -1,6 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
 const express = require('express')
+const bodyParser = require('body-parser')
 require('./tasks/lightMeterEnergy')
 
 const lightMeters = require('./controllers/lightmeters.controller')
@@ -12,6 +13,7 @@ const options = require('./controllers/options.controller')
 
 const PORT = process.env.PORT || 3003;
 const app = express();
+app.use(bodyParser.json());
 app.use(cors());
 app.listen(PORT, () => console.log(`listo por el puerto ${PORT}`))
 

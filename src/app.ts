@@ -10,6 +10,7 @@ const cabinets = require('./controllers/cabinets.controller')
 const apartments = require('./controllers/apartments.controller')
 const invoices = require('./controllers/invoices.controller')
 const options = require('./controllers/options.controller')
+const auth = require('./controllers/auth.controller')
 
 const PORT = process.env.PORT || 3003;
 const app = express();
@@ -23,6 +24,7 @@ app.use('/api/cabinets', cabinets);
 app.use('/api/apartments', apartments);
 app.use('/api/invoices', invoices);
 app.use('/api/options', options);
+app.use('/api/auth',auth);
 
 
 

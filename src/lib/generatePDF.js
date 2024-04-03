@@ -73,7 +73,7 @@ async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, sta
     const doc = new PDFDocument({ bufferPages: true, size: "A5", margin: 20 });
     let res = calculateEnergy(iva.option_value, energyPrice.option_value, fixedCharge.option_value, energy);
     doc
-        .image(__dirname + '/../img/harbor-171-logo.jpg', 20, 20, { width: 90 })
+        .image(__dirname + '/../img/harbor-logo-azul.jpg', 20, 20, { width: 90 })
         .fillColor("#000000")
         .fontSize(10)
         .font("Helvetica-Bold")
@@ -81,7 +81,7 @@ async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, sta
         .font("Helvetica-Bold")
         .text("Febronio Uribe 171", 200, 50, { align: "right" })
         .font("Helvetica-Bold")
-        .text("Zona Hotelera Norte, Las Glorias, C.P.48333", 100, 65, { align: "right" })
+        .text("Zona Hotelera Norte, C.P.48333", 100, 65, { align: "right" })
         .font("Helvetica-Bold")
         .text("Puerto Vallarta, Jalisco, MX.", 200, 80, { align: "right" })
         .moveDown();

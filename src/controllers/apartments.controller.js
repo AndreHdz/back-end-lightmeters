@@ -1,12 +1,65 @@
 const express = require('express')
 const router = express.Router();
-const service = require('../services/aparments.service')
+const service = require('../services/aparments.service');
+const getYesterday = require('../lib/getYesterday');
 
 
 router.get('/', async (req, res) => {
     const aparments = await service.getAllApartments()
     res.send(aparments)
 })
+
+router.get('/all-energy', async (req,res) => {
+    const today = req.query.date;
+    const yesterday = getYesterday(today);
+
+
+    if(!today){
+        return res.status(400).send({error: 'El parámetro date es obligatorio'})
+    }
+
+    try{
+        const recordsA = await service.getAllApartmentsTotalEnergy(today);
+        const recordsB = await service.getAllApartmentsTotalEnergy(yesterday);
+        if(!recordsA || !recordsB){
+            return res.status(500).send({error: 'No hay lecturas para alguna fecha'})
+        }
+
+        // Crear un objeto para almacenar los totales de energía por SN
+        const energyTotalsToday = {};
+        const energyTotalsYesterday = {};
+
+        // Calcular los totales de energía por SN para hoy
+        recordsA.forEach(record => {
+            energyTotalsToday[record.meter_sn] = (energyTotalsToday[record.meter_sn] || 0) + record.max_energy;
+        });
+
+        // Calcular los totales de energía por SN para ayer
+        recordsB.forEach(record => {
+            energyTotalsYesterday[record.meter_sn] = (energyTotalsYesterday[record.meter_sn] || 0) + record.max_energy;
+        });
+
+        // Calcular la diferencia de energía para cada SN
+        const energyDifferences = {};
+        Object.keys(energyTotalsToday).forEach(sn => {
+            if (energyTotalsYesterday[sn]) {
+                energyDifferences[sn] = energyTotalsToday[sn] - energyTotalsYesterday[sn];
+            }
+        });
+
+        // Calcular la suma de las diferencias de energía
+        let energyDifferenceSum = 0;
+        Object.values(energyDifferences).forEach(diff => {
+            energyDifferenceSum += diff;
+        });
+
+        res.send({ energyDifferences, energySum : parseFloat(energyDifferenceSum).toFixed(2)});
+
+    } catch(error){
+        console.error(error);
+        res.status(500).send({error: 'Error al obtener las lecturas'})
+    }
+});
 
 router.get('/energy', async (req,res) => {
     const { startDate, endDate } = req.body;
@@ -23,6 +76,8 @@ router.get('/energy', async (req,res) => {
         res.status(500).send({ error: 'Error al obtener los datos de energía.' });
     }
 })
+
+
 
 router.get('/:id', async (req,res) => {
     const apartmentId = req.params.id
@@ -60,7 +115,7 @@ router.get('/:id/get-energy', async (req, res) => {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     const energy = await service.getAparmentEnergy(apartmentId, startDate, endDate);
-    console.log(energy)
+    
     //res.send(energy)
      if (energy.sum == 0){
         res.status(404).json('Error, alguno de los medidores no envío la cantidad de energía')
@@ -68,6 +123,9 @@ router.get('/:id/get-energy', async (req, res) => {
         res.send(energy);
     }
 });
+
+
+
 
 
 module.exports = router;

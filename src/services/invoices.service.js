@@ -67,7 +67,12 @@ module.exports.insertInvoices = async (data) => {
     return affectedRows;
 }
 
-module.exports.insertReport = async (title,startDate, endDate) => {
+module.exports.insertReport = async (title, startDate, endDate) => {
     const [rows] = await db.query('INSERT INTO reports (title, startDate, endDate) VALUES (?,?,?)',[title,startDate,endDate])
     return rows
+}
+
+module.exports.getReports = async () => {
+    const [records] = await db.query('SELECT * FROM reports')
+    return records
 }

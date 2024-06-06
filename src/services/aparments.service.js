@@ -77,3 +77,16 @@ module.exports.getAllApartmentsEnergy = async (startDate, endDate) => {
     const apartmentsEnergyData = await Promise.all(apartmentEnergyPromises);
     return apartmentsEnergyData;
 };
+
+module.exports.getAllApartmentsTotalEnergy = async (date) => {
+    const [records] = await db.query(`SELECT r1.meter_sn, MAX(r1.energy) AS max_energy, r1.registration_date
+    FROM readings r1
+    WHERE DATE(r1.registration_date) = ?
+    GROUP BY r1.meter_sn;`, [date])
+
+    if(!records){
+        return
+    }
+
+    return records
+}

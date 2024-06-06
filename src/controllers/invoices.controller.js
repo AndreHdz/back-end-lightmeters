@@ -23,10 +23,15 @@ router.post('/', async(req,res) => {
     res.status(201).send('invoice created successfully')
 })
 
+
+router.get('/report', async(req,res) => {
+    const reports = await serviceInvoices.getReports();
+    res.send(reports)
+})
+
 router.get('/:id', async (req, res) => {
     const invoiceId = req.params.id;
     const [invoice] = await db.query("SELECT * FROM invoices WHERE id = ?", invoiceId)
-    console.log(invoice)
 
     try {
         const apartment = await service.getAparmentById(invoice[0].apartment_id)
@@ -36,7 +41,7 @@ router.get('/:id', async (req, res) => {
         const doc = await generatePDF(apartment,iva,energyPrice,fixedCharge,invoice[0].energy, invoice[0].start_date, invoice[0].end_date, invoice[0].id); 
 
         const filename = `${apartment.record[0].apartment_number} - ${apartment.record[0].apartment_owner} - ${formatPeriod(invoice[0].start_date)}.pdf`;
-        console.log(apartment)
+
 
         const stream = res.writeHead(200, {
             'Content-Type': 'application/pdf',
@@ -60,9 +65,10 @@ router.post('/report', async(req,res) => {
     if(!title || !startDate || !endDate){
         res.status(400).send({message: 'Se necesitan title, startDate y endDate'})
     }
-    const rows = await serviceInvoices.insertReport(title,startDate, endDate)
+    const rows = await serviceInvoices.insertReport(title, startDate, endDate)
     res.status(201).send({message: 'Reporte creado'})
 })
+
 
 router.get('/report/:id', async( req, res) => {
     const reportId = req.params.id;

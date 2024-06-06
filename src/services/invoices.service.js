@@ -43,7 +43,7 @@ module.exports.getInvoices = async (query, year, month, page, limit) => {
     queryParams.push(limit, offset)
 
     const [rows] = await db.query(`
-        SELECT * FROM invoices 
+        SELECT invoices.*, apartments.apartment_owner, apartments.apartment_number, apartments.service_key FROM invoices 
         LEFT JOIN apartments ON invoices.apartment_id = apartments.id 
         ${where}
         ORDER BY invoices.id DESC LIMIT ? OFFSET ?;`
@@ -52,7 +52,8 @@ module.exports.getInvoices = async (query, year, month, page, limit) => {
     const countParams = queryParams.slice(0,-2);
 
     const [countQuery] = await db.query(`
-        SELECT COUNT (*) AS total FROM invoices
+        SELECT COUNT(*) AS total 
+        FROM invoices 
         LEFT JOIN apartments ON invoices.apartment_id = apartments.id 
          ${where}`
          , countParams);
@@ -64,4 +65,9 @@ module.exports.getInvoices = async (query, year, month, page, limit) => {
 module.exports.insertInvoices = async (data) => {
     const [{affectedRows}] = await db.query('INSERT INTO invoices (apartment_id, energy, start_date, end_date) VALUES (?,?,?,?)',[data.apartment_id, data.energy, data.start_date, data.end_date])
     return affectedRows;
+}
+
+module.exports.insertReport = async (title,startDate, endDate) => {
+    const [rows] = await db.query('INSERT INTO reports (title, startDate, endDate) VALUES (?,?,?)',[title,startDate,endDate])
+    return rows
 }

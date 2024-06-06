@@ -1,4 +1,4 @@
-const PDFDocument = require('pdfkit')
+const PDFDocument = require('pdfkit-construct')
 const serviceApartment =require('../services/aparments.service');
 const formatPeriod = require('./formatPeriod');
 
@@ -8,7 +8,7 @@ function generateHr(doc, y) {
         .strokeColor("#aaaaaa")
         .lineWidth(1)
         .moveTo(20, y)
-        .lineTo(395, y)
+        .lineTo(575, y)
         .stroke();
 }
 
@@ -39,19 +39,15 @@ function formatCurrency(cents) {
     return "$" + (cents / 1).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
 }
 
-function generateTableRow(
-    doc,
-    y,
-    description,
-    amount,
-) {
-    doc
-        .fontSize(10)
-        .text(description, 20, y)
-        .text(amount, 300, y, { width: 90, align: "right" })
-}
-
 function calculateEnergy(iva,energyPrice,fixedCharge,energy){
+
+    if(!energy){
+        return {energyPrice : 0,
+            subtotal : 0,
+            iva : 0,
+            total : 0}
+    }
+
     const ivaNumber =  parseInt(iva);
     const energyPriceNumber = parseFloat(energyPrice);
     const fixedChargeNumber = parseFloat(fixedCharge);
@@ -67,13 +63,38 @@ function calculateEnergy(iva,energyPrice,fixedCharge,energy){
     }
 }
 
+async function generatePDF(title, startDate, endDate, iva, energyPrice, fixedCharge){
+
+    const rows = await serviceApartment.getAllApartmentsEnergy(startDate, endDate)
+
+    let data = []
+    let totalEnergy = 0
+    let totalAmount = 0
+
+    for(let i = 0; i < rows.length; i++){
+        const row = rows[i]
+        const amount = calculateEnergy(iva.option_value, energyPrice.option_value, fixedCharge.option_value, row.energy.total)
+        data.push({ 
+            service_key: row.apartmentInfo[0].service_key,
+            apartment_owner :  row.apartmentInfo[0].apartment_owner,
+            apartment_number: row.apartmentInfo[0].apartment_number,
+            energy : row.energy.total,
+            amount : formatCurrency(amount.total)
+        })
+
+        totalEnergy += row.energy.total
+        totalAmount += amount.total
+    }
+    const totals = [{
+        total_energy: parseFloat(totalEnergy).toFixed(2),
+        total_amount: formatCurrency(totalAmount)
+    }]
 
 
-
-async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, startDate, endDate, id){
     const doc = new PDFDocument({ bufferPages: true, size: "A4", margin: 20 });
-    let res = calculateEnergy(iva.option_value, energyPrice.option_value, fixedCharge.option_value, energy);
-    doc
+
+    doc.setDocumentHeader({height: '10%'}, () => {
+        doc
         .image(__dirname + '/../img/harbor-logo-azul.jpg', 20, 20, { width: 90 })
         .fillColor("#000000")
         .fontSize(10)
@@ -86,100 +107,54 @@ async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, sta
         .font("Helvetica-Bold")
         .text("Puerto Vallarta, Jalisco, MX.", 200, 80, { align: "right" })
         .moveDown();
-
-    //Información del Departamento
-    doc
+        //Información del Departamento
+        doc
         .fillColor("#000000")
-        .fontSize(14)
-        .text("Consumo de energía", 20, 110)
-        .fontSize(13)
-        .text(`${formatPeriod( invoiceDate(startDate))}`, 250, 110.5);
+        .fontSize(12)
+        .text('Reporte de energía mensual', 20, 110)
+        .text(`${formatPeriod(startDate)}`, 200, 110.5, {align: "right"});
 
-    generateHr(doc, 135);
+        generateHr(doc, 135);
 
-    const customerInformationTop = 150;
-
-    const today = new Date()
-
-    doc
-        .fontSize(10)
-        .text(`Recibo #${id}`, 20, customerInformationTop)
-        .font("Helvetica-Bold")
-        .font("Helvetica")
-        .text(`Fecha: ${invoiceDate(today)}`, 20, customerInformationTop + 15)
-        .font("Helvetica")
-        .text(`Periodo: ${formatPeriod( invoiceDate(startDate))}`, 20, customerInformationTop + 30)
-        .text(`Energía consumida: ${energy} kw`, 20, customerInformationTop + 45)
-        .font("Helvetica-Bold")
-        .text(apartment.record[0].apartment_owner, 250, customerInformationTop)
-        .font("Helvetica")
-        .text(`Departamento ${apartment.record[0].apartment_number}`, 250, customerInformationTop + 15)
-        .text(`Servicio: ${apartment.record[0].service_key}`,
-            250,
-            customerInformationTop + 30
-        )
-        .moveDown();
-
-    generateHr(doc, 217);
-
-    doc.text("Fecha límite de pago día 10", 20, customerInformationTop + 80)
-
-    //Cargos
-    let i;
-    const invoiceTableTop = 290;
-
-    doc.font("Helvetica-Bold");
-    generateTableRow(
-        doc,
-        invoiceTableTop,
-        "Descripción",
-        "Importe(MXN)",
-    );
-    generateHr(doc, invoiceTableTop + 20);
-    doc.font("Helvetica");
+    })
 
 
+    doc.addTable(
+        [
+            {key: 'service_key', label: 'Servicio N.', align: 'left'},
+            {key: 'apartment_number', label: 'N. Departamento', align: 'left'},
+            {key: 'apartment_owner', label: 'Dueño', align: 'left'},
+            {key: 'energy', label: 'Energía', align: 'left'},
+            {key: 'amount', label: 'Monto', align: 'left'}
+        ],
+        data, {
+            border: null,
+            width: "fill_body",
+            striped: true,
+            stripedColors: ["#f6f6f6", "#ededed"],
+            cellsPadding: 5,
+            headAlign: 'left'
+        });
+
+    doc.addTable(
+        [
+            {key : 'total_energy', label: 'Energia Total', align: 'left'},
+            {key : 'total_amount', label: 'Costo Total', align: 'left'}
+        ], totals , {
+            border: null,
+            marginTop: 20,
+            width: "auto",
+            cellsAlign: "right",
+            striped: true,
+            stripedColors: ["#f6f6f6", "#d6c4dd"],
+            cellsPadding: 5,
+            headAlign: 'left'
+        });
+
+    // render tables
+    doc.render();
 
 
-    const invoice = {
-        items : [
-            {
-                description: "Cargo por energía",
-                amount : res.energyPrice
-            },
-            {
-                description: "Cargo Fijo",
-                amount : fixedCharge.option_value
-            },
-            {
-                description: `IVA ${iva.option_value}%`,
-                amount : res.iva
-            }
-        ]
-    }
-
-
-    for (i = 0; i < invoice.items.length; i++) {
-        const item = invoice.items[i];
-        const position = invoiceTableTop + (i + 1) * 30;
-        generateTableRow(
-            doc,
-            position,
-            item.description,
-            formatCurrency(item.amount)
-        );
-
-        generateHr(doc, position + 20);
-    }
-
-    const subtotalPosition = invoiceTableTop + (i + 1) * 30;
-    generateTableRow(
-      doc,
-      subtotalPosition,
-      "",
-      `Total: ${formatCurrency(res.total)}`,
-      formatCurrency(invoice.subtotal)
-    );
 
 
     return doc

@@ -1,8 +1,9 @@
 const db = require('../db2')
 
 module.exports.getAllReadings = async () => {
-    const [rows] = await db.query("SELECT * FROM readings")
+    const [rows] = await db.query("SELECT * FROM readings ORDER BY registration_date DESC LIMIT 20")
     return rows
+    
 }
 
 module.exports.getReadingByMeterId = async (id) => {

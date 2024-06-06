@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const generateReportPDF = require('../lib/generateReportPDF')
 const generatePDF = require('../lib/generatePDF')
 const serviceInvoices = require('../services/invoices.service')
 const service = require('../services/aparments.service');
 const serviceOptions = require('../services/options.service')
 const db = require('../db2')
-
 const formatPeriod = require('../lib/formatPeriod')
-
 
 router.get('/', async(req,res) => {
     const page = parseInt(req.query.page) || 1;
@@ -20,18 +19,15 @@ router.get('/', async(req,res) => {
 });
 
 router.post('/', async(req,res) => {
-    console.log(req.body)
     const affectedRows =  await serviceInvoices.insertInvoices(req.body);
     res.status(201).send('invoice created successfully')
 })
-
 
 router.get('/:id', async (req, res) => {
     const invoiceId = req.params.id;
     const [invoice] = await db.query("SELECT * FROM invoices WHERE id = ?", invoiceId)
     console.log(invoice)
 
-    
     try {
         const apartment = await service.getAparmentById(invoice[0].apartment_id)
         const iva = await serviceOptions.getOption('iva');
@@ -57,5 +53,46 @@ router.get('/:id', async (req, res) => {
         res.status(500).send('Error interno al generar el PDF');
     }
 });
+
+router.post('/report', async(req,res) => {
+
+    const {title, startDate, endDate} = req.body;
+    if(!title || !startDate || !endDate){
+        res.status(400).send({message: 'Se necesitan title, startDate y endDate'})
+    }
+    const rows = await serviceInvoices.insertReport(title,startDate, endDate)
+    res.status(201).send({message: 'Reporte creado'})
+})
+
+router.get('/report/:id', async( req, res) => {
+    const reportId = req.params.id;
+    const [report] = await db.query("SELECT * FROM reports WHERE id = ?", reportId)
+
+    const {title, startDate, endDate} = report[0];
+
+    try {
+        const iva = await serviceOptions.getOption('iva');
+        const energyPrice = await serviceOptions.getOption('energy_price');
+        const fixedCharge = await serviceOptions.getOption('fixed_charge');
+
+        const doc = await generateReportPDF(title, startDate, endDate, iva, energyPrice, fixedCharge); 
+
+        const filename = `${title}.pdf`;
+
+        const stream = res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-disposition': `attachment;filename=${filename}`
+        });
+
+        doc.on('data', (data) => { stream.write(data) });
+        doc.on('end', () => { stream.end() });
+
+        doc.end();
+    } catch (error) {
+        // Manejo de errores si la promesa se rechaza
+        console.error('Error al generar el PDF:', error);
+        res.status(500).send('Error interno al generar el PDF');
+    }
+})
 
 module.exports = router;

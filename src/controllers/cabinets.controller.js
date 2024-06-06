@@ -16,4 +16,5 @@ router.get('/:id', async (req,res) => {
         res.send(cabinet)
 })
 
+
 module.exports = router;

@@ -11,6 +11,11 @@ module.exports.getAparmentById = async (id) => {
     return {record, meters};
 }
 
+module.exports.updateApartmentOwner = async (id, apartmentOwner) => {
+    const [result] = await db.query("UPDATE apartments SET apartment_owner = ? WHERE id = ?", [apartmentOwner, id])
+    return result;
+};
+
 module.exports.getAparmentEnergy = async (id, startDate, endDate) => {
     async function searchEnergy(date, meterId){
         const [records] = await db.query("SELECT * FROM `readings` WHERE DATE(registration_date) = ? AND meter_id = ? ORDER BY energy ASC;", [date, meterId]);
@@ -40,12 +45,10 @@ module.exports.getAparmentEnergy = async (id, startDate, endDate) => {
             const energyB = await searchEnergy(endDate, lightmeterId);
 
             if (!energyA) {
-                return {error : `No se encontraron datos válidos para energia A - ${lightmeterSn}`};
+                return {total: 0, error : `No se encontraron datos válidos para energia A - ${lightmeterSn}`};
             } else if (!energyB) {
-                return {error : `No se encontraron datos válidos para energia B -  ${lightmeterSn}`};
-
+                return {total: 0, error : `No se encontraron datos válidos para energia B -  ${lightmeterSn}`};
             }
-
             let diffEnergy = energyB.energy - energyA.energy;
             totalEnergy += diffEnergy;
             energy.push({
@@ -64,3 +67,13 @@ module.exports.getAparmentEnergy = async (id, startDate, endDate) => {
     
     return {apartmentInfo: await getApartmentInfo(id), lightmeters: await getLightmeters(id), energy : await calculateEnergy(await getLightmeters(id))}
 }
+
+
+module.exports.getAllApartmentsEnergy = async (startDate, endDate) => {
+    const [apartmentsId] = await db.query('SELECT id FROM apartments');
+    const apartmentEnergyPromises = apartmentsId.map(apartment => 
+        this.getAparmentEnergy(apartment.id, startDate, endDate)
+    );
+    const apartmentsEnergyData = await Promise.all(apartmentEnergyPromises);
+    return apartmentsEnergyData;
+};

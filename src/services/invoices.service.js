@@ -17,23 +17,48 @@ module.exports.getInvoice = async () => {
 } */
 const db = require('../db2')
 
-module.exports.getInvoices = async (page, limit) => {
+module.exports.getInvoices = async (query, year, month, page, limit) => {
     const offset = (page - 1) * limit;
-    const [rows] = await db.query("SELECT * FROM invoices ORDER BY id DESC LIMIT ? OFFSET ?;", [limit, offset])
-    const [countQuery] = await db.query("SELECT COUNT (*) AS total FROM invoices");
-    const totalCount = countQuery[0].total;
+    const searchQuery =  `%${query}%`;
 
-    for(let i = 0; i < rows.length; i++){
-        const invoice = rows[i];
-        const [apartment] = await db.query("SELECT * FROM apartments WHERE id = ?", invoice.apartment_id)
-        if(apartment.length > 0){
-            invoice.apartment_owner = apartment[0].apartment_owner;
-            invoice.apartment_number = apartment[0].apartment_number;
-        } else {
-            console.log(`No se econtro registro para ${invoice.id}`)
-        }
+    let where = 'WHERE 1 = 1'
+    const queryParams = []
+
+    if(query){
+        where += ' AND (apartments.apartment_owner LIKE ? OR apartments.apartment_number LIKE ?)'
+        queryParams.push(searchQuery, searchQuery)
     }
-    return {data: rows, totalRows: totalCount}
+
+    if(year && month){
+        where += ' AND (YEAR(invoices.start_date) = ? AND MONTH(invoices.start_date) = ?)'
+        queryParams.push(year, month)
+    } else if (month){
+        where += ' AND (MONTH(invoices.start_date) = ?)'
+        queryParams.push(month)
+    } else if (year){
+        where += ' AND (YEAR(invoices.start_date) = ?)'
+        queryParams.push(year)
+    }
+
+    queryParams.push(limit, offset)
+
+    const [rows] = await db.query(`
+        SELECT * FROM invoices 
+        LEFT JOIN apartments ON invoices.apartment_id = apartments.id 
+        ${where}
+        ORDER BY invoices.id DESC LIMIT ? OFFSET ?;`
+        , queryParams)
+
+    const countParams = queryParams.slice(0,-2);
+
+    const [countQuery] = await db.query(`
+        SELECT COUNT (*) AS total FROM invoices
+        LEFT JOIN apartments ON invoices.apartment_id = apartments.id 
+         ${where}`
+         , countParams);
+
+    const totalCount = countQuery[0].total;
+    return {data: rows, totalRows: totalCount};
 }
 
 module.exports.insertInvoices = async (data) => {

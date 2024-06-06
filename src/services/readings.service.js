@@ -74,12 +74,10 @@ module.exports.getReadinsgByApartment = async (date) => {
     const [apartments] = await db.query("SELECT apartments.apartment_number, apartments.apartment_owner, GROUP_CONCAT(lightmeters.serial_number) AS serial_numbers FROM lightmeters INNER JOIN apartments ON lightmeters.apartment_id = apartments.id GROUP BY apartments.apartment_number;");
 
     //Sumar energias por departamento
-
     for(let i = 0; i < apartments.length; i++){
         const apartment = apartments[i];
         apartment.serial_numbers = apartment.serial_numbers.split(",")
         apartment.total_energy = 0;
-
         for(let j = 0; j < apartment.serial_numbers.length; j++){
             const serialNumber = apartment.serial_numbers[j];
 
@@ -87,7 +85,6 @@ module.exports.getReadinsgByApartment = async (date) => {
                 const record = records[k];
                 if(record.meter_sn === serialNumber){
                     apartment.total_energy += record.energy
-                
                 }
             } 
         }

@@ -4,6 +4,7 @@ const mysql = require('mysql2/promise');
 const db2 = require("../db2");
 const date = require("../lib/date");
 const ping =  require("ping");
+const serviceApartments = require("../services/aparments.service")
 
 async function doPing(ip) {
     try {
@@ -16,8 +17,8 @@ async function doPing(ip) {
 }
 
 
-// Define la tarea cron para ejecutar a las 6 PM todos los días
-cron.schedule("*/5 * * * *", async () => {
+// TAREA OBTENER LA MEDICIONES, SE EJECUTA CADA MEDIA HORA
+cron.schedule("*/30 * * * *", async () => {
     const formattedDate = date();
     const [ips] = await db2.query("SELECT ip, cabinet_number FROM cabinets");
 
@@ -46,7 +47,7 @@ cron.schedule("*/5 * * * *", async () => {
                         serial_number 
                 FROM last_readings  
                 INNER JOIN meter ON last_readings.meter_id = meter.id
-                WHERE DATE(last_readings.meter_registration_date) = "${formattedDate}" AND EXTRACT(HOUR FROM last_readings.meter_registration_date) = 12`
+                WHERE DATE(last_readings.meter_registration_date) = "${formattedDate}"`
             );
                 if (records.length > 0) {	
                     for (let j = 0; j < records.length; j++) {
@@ -87,10 +88,10 @@ cron.schedule("*/5 * * * *", async () => {
 
 
 
-//Actualizar status de medidor
+//TAREA PARA ACTUALIZA ESTATUS DE LOS MEDIDORES
 cron.schedule("*/10 * * * * *", async () => {
     const formattedDate = date();
-    console.log(formattedDate);
+    //console.log(formattedDate);
     try {
         // Primero, actualizar todos los medidores a estado 0
         await db2.query(
@@ -119,9 +120,9 @@ cron.schedule("*/10 * * * * *", async () => {
                 );
             });
             await Promise.all(updatePromises);
-            console.log('Registros actualizados correctamente.');
+            //console.log('Registros actualizados correctamente.');
         } else {
-            console.log('No hay registros para actualizar. Todos los medidores se han establecido en estado 0.');
+            //console.log('No hay registros para actualizar. Todos los medidores se han establecido en estado 0.');
         }
     } catch (error) {
         console.error("Error en la tarea cron:", error);
@@ -147,6 +148,15 @@ cron.schedule("*/5 * * * *", async () => {
         console.log(error)
     }
 });
+
+//Crear 
+/* (async () => {
+    const startDate = "2024/02/01";
+    const endDate = "2024/02/28";
+    const data = await  serviceApartments.getAllApartmentsEnergy(startDate,endDate)
+    console.log(data)
+})();
+ */
 
 
 //Crear Invoices

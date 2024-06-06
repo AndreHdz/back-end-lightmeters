@@ -12,7 +12,10 @@ const formatPeriod = require('../lib/formatPeriod')
 router.get('/', async(req,res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const invoices = await serviceInvoices.getInvoices(page, limit);
+    const query = req.query.q;
+    const year = req.query.year;
+    const month = req.query.month
+    const invoices = await serviceInvoices.getInvoices(query, year, month, page, limit);
     res.send({page: page, limit: limit, data: invoices.data, totalResults: invoices.totalRows})    
 });
 
@@ -36,7 +39,7 @@ router.get('/:id', async (req, res) => {
         const fixedCharge = await serviceOptions.getOption('fixed_charge');
         const doc = await generatePDF(apartment,iva,energyPrice,fixedCharge,invoice[0].energy, invoice[0].start_date, invoice[0].end_date, invoice[0].id); 
 
-        const filename = `ENERGÍA A CUENTA DE CONDÓMINIO - ${apartment.record[0].apartment_number} - ${formatPeriod(invoice[0].start_date)}.pdf`;
+        const filename = `${apartment.record[0].apartment_number} - ${apartment.record[0].apartment_owner} - ${formatPeriod(invoice[0].start_date)}.pdf`;
         console.log(apartment)
 
         const stream = res.writeHead(200, {

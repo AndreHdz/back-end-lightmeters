@@ -71,7 +71,7 @@ function calculateEnergy(iva,energyPrice,fixedCharge,energy){
 
 
 async function generatePDF(apartment, iva, energyPrice, fixedCharge, energy, startDate, endDate, id){
-    const doc = new PDFDocument({ bufferPages: true, size: "A5", margin: 20 });
+    const doc = new PDFDocument({ bufferPages: true, size: "A4", margin: 20 });
     let res = calculateEnergy(iva.option_value, energyPrice.option_value, fixedCharge.option_value, energy);
     doc
         .image(__dirname + '/../img/harbor-logo-azul.jpg', 20, 20, { width: 90 })

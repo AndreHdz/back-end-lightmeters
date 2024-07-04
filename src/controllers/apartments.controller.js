@@ -2,62 +2,50 @@ const express = require('express')
 const router = express.Router();
 const service = require('../services/aparments.service');
 const getYesterday = require('../lib/getYesterday');
-
+const NodeCache = require('node-cache');
+const cache = new NodeCache({ stdTTL: 8 * 24 * 60 * 60 }); 
 
 router.get('/', async (req, res) => {
     const aparments = await service.getAllApartments()
     res.send(aparments)
 })
 
-router.get('/all-energy', async (req,res) => {
+router.get('/all-energy', async (req, res) => {
     const today = req.query.date;
-    const yesterday = getYesterday(today);
 
-
-    if(!today){
-        return res.status(400).send({error: 'El parámetro date es obligatorio'})
+    if (!today) {
+        return res.status(400).send({ error: 'El parámetro date es obligatorio' });
     }
 
-    try{
-        const recordsA = await service.getAllApartmentsTotalEnergy(today);
-        const recordsB = await service.getAllApartmentsTotalEnergy(yesterday);
-        if(!recordsA || !recordsB){
-            return res.status(500).send({error: 'No hay lecturas para alguna fecha'})
-        }
+    const yesterday = getYesterday(today);
+    const cacheKey = `${yesterday}_${today}`;
 
-        // Crear un objeto para almacenar los totales de energía por SN
-        const energyTotalsToday = {};
-        const energyTotalsYesterday = {};
+    // Verificar si los datos están en la caché
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+        console.log('Usando datos de la caché');
+        return res.send(cachedData);
+    }
 
-        // Calcular los totales de energía por SN para hoy
-        recordsA.forEach(record => {
-            energyTotalsToday[record.meter_sn] = (energyTotalsToday[record.meter_sn] || 0) + record.max_energy;
-        });
+    try {
+        const records = await service.getAllApartmentsEnergy(yesterday, today);
+        console.log(records);
 
-        // Calcular los totales de energía por SN para ayer
-        recordsB.forEach(record => {
-            energyTotalsYesterday[record.meter_sn] = (energyTotalsYesterday[record.meter_sn] || 0) + record.max_energy;
-        });
+        const energyDifferenceSum = records.reduce((sum, record) => sum + (record.energy.total || 0), 0);
+        console.log(energyDifferenceSum);
 
-        // Calcular la diferencia de energía para cada SN
-        const energyDifferences = {};
-        Object.keys(energyTotalsToday).forEach(sn => {
-            if (energyTotalsYesterday[sn]) {
-                energyDifferences[sn] = energyTotalsToday[sn] - energyTotalsYesterday[sn];
-            }
-        });
+        const responseData = {
+            energyDifferences: records,
+            energySum: parseFloat(energyDifferenceSum).toFixed(2)
+        };
 
-        // Calcular la suma de las diferencias de energía
-        let energyDifferenceSum = 0;
-        Object.values(energyDifferences).forEach(diff => {
-            energyDifferenceSum += diff;
-        });
+        // Guardar los datos en la caché
+        cache.set(cacheKey, responseData);
 
-        res.send({ energyDifferences, energySum : parseFloat(energyDifferenceSum).toFixed(2)});
-
-    } catch(error){
+        res.send(responseData);
+    } catch (error) {
         console.error(error);
-        res.status(500).send({error: 'Error al obtener las lecturas'})
+        res.status(500).send({ error: 'Error al obtener las lecturas' });
     }
 });
 
@@ -67,7 +55,6 @@ router.get('/energy', async (req,res) => {
     if (!startDate || !endDate) {
         return res.status(400).send({ error: 'Los parámetros startDate y endDate son obligatorios.' });
     }
-
     try {
         const energyData = await service.getAllApartmentsEnergy(startDate, endDate);
         res.send(energyData);

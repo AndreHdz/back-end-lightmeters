@@ -89,6 +89,5 @@ module.exports.getAllApartmentsTotalEnergy = async (date) => {
     if(!records){
         return
     }
-
     return records
 }

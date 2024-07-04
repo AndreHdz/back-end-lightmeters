@@ -1,7 +1,7 @@
 const db = require('../db2')
 
 module.exports.getAllApartments = async () => {
-    const [rows] = await db.query("SELECT * FROM apartments")
+    const [rows] = await db.query("SELECT apartments.id, apartments.apartment_number, apartments.apartment_owner, apartments.service_key, apartments.meter_type, GROUP_CONCAT(lightmeters.serial_number) AS serial_numbers FROM lightmeters INNER JOIN apartments ON lightmeters.apartment_id = apartments.id GROUP BY apartments.apartment_number ORDER BY CAST(SUBSTRING_INDEX(apartments.apartment_number, '-', 1) AS UNSIGNED) ASC, apartments.apartment_number ASC;")
     return rows
 }
 
@@ -77,6 +77,8 @@ module.exports.getAllApartmentsEnergy = async (startDate, endDate) => {
     const apartmentsEnergyData = await Promise.all(apartmentEnergyPromises);
     return apartmentsEnergyData;
 };
+
+
 
 module.exports.getAllApartmentsTotalEnergy = async (date) => {
     const [records] = await db.query(`SELECT r1.meter_sn, MAX(r1.energy) AS max_energy, r1.registration_date

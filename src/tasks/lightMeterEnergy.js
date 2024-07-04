@@ -2,9 +2,10 @@ require('dotenv/config')
 const cron = require("node-cron");
 const mysql = require('mysql2/promise');
 const db2 = require("../db2");
-const date = require("../lib/date");
+const date = require("../lib/formatDate");
 const ping =  require("ping");
-const serviceApartments = require("../services/aparments.service")
+const serviceApartments = require("../services/aparments.service");
+const formatPeriod = require('../lib/formatPeriod');
 
 async function doPing(ip) {
     try {
@@ -149,7 +150,7 @@ cron.schedule("*/5 * * * *", async () => {
     }
 });
 
-//Crear 
+//Crear Reporte
 /* (async () => {
     const startDate = "2024/02/01";
     const endDate = "2024/02/28";
@@ -160,28 +161,43 @@ cron.schedule("*/5 * * * *", async () => {
 
 
 //Crear Invoices
+/* 
+( async () => {
+    const startDate = "2024/06/01";
+    const endDate = "2024/06/30";
 
-/* ( async () => {
-    const startDate = "2024/02/01";
-    const endDate = "2024/02/28";
+    const period = formatPeriod(startDate)
+
     try{
-        const [apartments] = await db2.query(`SELECT * FROM apartments`);
-        let error = 0;
-        for(let i = 0; i < apartments.length; i++){
-            const apartment = apartments[i];
-            const energyObjetct = await serviceApartment.getAparmentEnergy(apartment.id, startDate, endDate)
-            if(energyObjetct.energy.total){
-                await db2.query(`INSERT INTO invoices (apartment_id, energy, start_date, end_date) VALUES (?, ?, ?, ?)`,[energyObjetct.apartmentInfo[0].id, energyObjetct.energy.total, startDate, endDate])
-            } else {
-                error++
-                console.log(`${error}-No se econtro energia para Departamento: ${apartment.apartment_number}`)
-            }
-        }
-    }catch(error){
-        console.log(error)
-    }
-})(); */
+        const [reportResult] = await db2.query('INSERT INTO reports (title, startDate, endDate) VALUES (?,?,?)',[`Reporte mensual ${period}`, startDate, endDate])
+        const reportId = reportResult.insertId;
+        console.log(`Reporte creado con ID: ${reportId}`)
 
+        try{
+            const [apartments] = await db2.query(`SELECT * FROM apartments`);
+            let error = 0;
+            for(let i = 0; i < apartments.length; i++){
+                const apartment = apartments[i];
+                const energyObjetct = await serviceApartments.getAparmentEnergy(apartment.id, startDate, endDate)
+                if(energyObjetct.energy.total){
+                    await db2.query(`INSERT INTO invoices (apartment_id, energy, start_date, end_date, report_id) VALUES (?, ?, ?, ?, ?)`,[energyObjetct.apartmentInfo[0].id, energyObjetct.energy.total, startDate, endDate, reportId])
+                } else {
+                    error++
+                    await db2.query(`INSERT INTO invoices (apartment_id, energy, start_date, end_date, report_id) VALUES (?, ?, ?, ?, ?)`,[energyObjetct.apartmentInfo[0].id, 0, startDate, endDate, reportId])
+                    console.log(`${error} - No se econtro energia para Departamento: ${apartment.apartment_number}`)
+                }
+            }
+        }catch(err){
+            console.error(err)
+        }
+
+    }catch(error){
+        console.error('Error al crear Reporte')
+    }
+})();
+
+
+ */
 
 //Extraer DATOS XML
 /* (async () => {

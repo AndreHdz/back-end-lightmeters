@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const db = require('../db2')
 const generateReportPDF = require('../lib/generateReportPDF')
 const generatePDF = require('../lib/generatePDF')
+const formatPeriod = require('../lib/formatPeriod')
 const serviceInvoices = require('../services/invoices.service')
 const service = require('../services/aparments.service');
 const serviceOptions = require('../services/options.service')
-const db = require('../db2')
-const formatPeriod = require('../lib/formatPeriod')
 
 router.get('/', async(req,res) => {
     const page = parseInt(req.query.page) || 1;
@@ -23,26 +23,45 @@ router.post('/', async(req,res) => {
     res.status(201).send('invoice created successfully')
 })
 
-
 router.get('/report', async(req,res) => {
     const reports = await serviceInvoices.getReports();
     res.send(reports)
 })
 
+router.get('/zip/:id', async(req,res) => {
+    const {id} = req.params;
+
+    const [report] = await db.query(`SELECT * FROM reports WHERE id = ${id}`)
+    console.log(report);
+
+    try{
+        const zipContent = await serviceInvoices.generateReportZip(id);
+        res.set({
+            'Content-Type' : 'application/zip',
+            'Content-Disposition' : `attachment; filename=${formatPeriod(report[0].startDate)}`,
+            'Content-Lenght' : zipContent.length
+        });
+        res.send(zipContent)
+    } catch (err){
+        console.error(err);
+        res.status(500).send('Error generating the ZipFile')
+    }
+})
+
 router.get('/:id', async (req, res) => {
     const invoiceId = req.params.id;
     const [invoice] = await db.query("SELECT * FROM invoices WHERE id = ?", invoiceId)
-
     try {
-        const apartment = await service.getAparmentById(invoice[0].apartment_id)
-        const iva = await serviceOptions.getOption('iva');
-        const energyPrice = await serviceOptions.getOption('energy_price');
-        const fixedCharge = await serviceOptions.getOption('fixed_charge');
-        const doc = await generatePDF(apartment,iva,energyPrice,fixedCharge,invoice[0].energy, invoice[0].start_date, invoice[0].end_date, invoice[0].id); 
-
-        const filename = `${apartment.record[0].apartment_number} - ${apartment.record[0].apartment_owner} - ${formatPeriod(invoice[0].start_date)}.pdf`;
-
-
+        const data = await service.getAparmentById(invoice[0].apartment_id);
+        const apartment = {
+            apartment_number : data.record[0].apartment_number,
+            apartment_owner: data.record[0].apartment_owner,
+            service_key: data.record[0].service_key,
+        }
+        console.log(apartment);
+        
+        const doc = await generatePDF(apartment,invoice[0].energy, invoice[0].start_date, invoice[0].end_date, invoice[0].id); 
+        const filename = `${apartment.apartment_number} - ${apartment.apartment_owner} - ${formatPeriod(invoice[0].start_date)}.pdf`;
         const stream = res.writeHead(200, {
             'Content-Type': 'application/pdf',
             'Content-disposition': `attachment;filename=${filename}`
@@ -59,8 +78,9 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-router.post('/report', async(req,res) => {
 
+
+router.post('/report', async(req,res) => {
     const {title, startDate, endDate} = req.body;
     if(!title || !startDate || !endDate){
         res.status(400).send({message: 'Se necesitan title, startDate y endDate'})
@@ -81,13 +101,13 @@ router.get('/report/:id', async( req, res) => {
         const energyPrice = await serviceOptions.getOption('energy_price');
         const fixedCharge = await serviceOptions.getOption('fixed_charge');
 
-        const doc = await generateReportPDF(title, startDate, endDate, iva, energyPrice, fixedCharge); 
+        const doc = await generateReportPDF(title, startDate, endDate, iva, energyPrice, fixedCharge, reportId); 
 
         const filename = `${title}.pdf`;
 
         const stream = res.writeHead(200, {
             'Content-Type': 'application/pdf',
-            'Content-disposition': `attachment;filename=${filename}`
+            'Content-disposition': `attachment;filename='${filename}'`
         });
 
         doc.on('data', (data) => { stream.write(data) });

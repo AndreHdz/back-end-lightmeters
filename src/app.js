@@ -1,5 +1,5 @@
-import "dotenv/config";
-import cors from "cors";
+require ("dotenv/config");
+const cors = require('cors');
 const express = require('express')
 const bodyParser = require('body-parser')
 require('./tasks/lightMeterEnergy')

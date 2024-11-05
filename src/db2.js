@@ -12,7 +12,10 @@ const mysqlPool2 = mysql2.createPool({
     host: HOST,
     user: USER,
     password: PASSWORD,
-    database : DB
+    database : DB,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 })
 
 module.exports = mysqlPool2

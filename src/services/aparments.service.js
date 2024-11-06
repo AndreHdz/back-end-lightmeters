@@ -57,36 +57,78 @@ module.exports.getAparmentEnergy = async (id, startDate, endDate) => {
         const apartment = await db.query("SELECT * FROM `apartments` WHERE id = ?" , id)
         return apartment[0];
     }
-
-    async function calculateEnergy(lightmeters){
+    async function calculateEnergy(lightmeters) {
         let energy = [];
         let totalEnergy = 0;
-        for(let i=0; i < lightmeters.length ; i++){
-            let lightmeterId =  lightmeters[i].id
-            let lightmeterSn =  lightmeters[i].serial_number
+    
+        for (let i = 0; i < lightmeters.length; i++) {
+            let lightmeterId = lightmeters[i].id;
+            let lightmeterSn = lightmeters[i].serial_number;
+    
             const energyA = await searchEnergy(startDate, lightmeterId);
             const energyB = await searchEnergy(endDate, lightmeterId);
-
-            if (!energyA) {
-                return {total: 0, error : `No se encontraron datos válidos para energia A - ${lightmeterSn}`};
-            } else if (!energyB) {
-                return {total: 0, error : `No se encontraron datos válidos para energia B -  ${lightmeterSn}`};
+            let diffEnergy = 0;
+    
+            // Caso donde faltan ambos datos de energía A y B
+            if (!energyA && !energyB) {
+                energy.push({
+                    lightmeterId: lightmeterId,
+                    lightmeterSn: lightmeterSn,
+                    energyTotal: 0,
+                    energy: { a: null, b: null },
+                    warning: `No se encontraron datos válidos para energía A y B - ${lightmeterSn}`,
+                });
+                continue;  // Saltar a la siguiente iteración
             }
-            let diffEnergy = energyB.energy - energyA.energy;
+    
+            // Caso donde falta solo `energyA`
+            if (!energyA) {
+                energy.push({
+                    lightmeterId: lightmeterId,
+                    lightmeterSn: lightmeterSn,
+                    energyTotal: 0,
+                    energy: { a: null, b: energyB },
+                    warning: `No se encontraron datos válidos para energía A - ${lightmeterSn}`,
+                });
+                continue;
+            }
+    
+            // Caso donde falta solo `energyB`
+            if (!energyB) {
+                energy.push({
+                    lightmeterId: lightmeterId,
+                    lightmeterSn: lightmeterSn,
+                    energyTotal: 0,
+                    energy: { a: energyA, b: null },
+                    warning: `No se encontraron datos válidos para energía B - ${lightmeterSn}`,
+                });
+                continue;
+            }
+    
+            // Caso donde ambos valores están presentes
+            diffEnergy = energyB.energy - energyA.energy;
             totalEnergy += diffEnergy;
+    
             energy.push({
-                lightmeterId : lightmeterId,
-                lightmeterSn : lightmeterSn,
-                energyTotal : parseFloat(diffEnergy.toFixed(2)),
+                lightmeterId: lightmeterId,
+                lightmeterSn: lightmeterSn,
+                energyTotal: parseFloat(diffEnergy.toFixed(2)),
                 energy: {
-                    a : energyA,
+                    a: energyA,
                     b: energyB,
                 }
             });
         }
-
-        return {total: parseFloat(totalEnergy.toFixed(2)), startDate: startDate, endDate: endDate, data: energy};
+    
+        return {
+            total: parseFloat(totalEnergy.toFixed(2)),
+            startDate: startDate,
+            endDate: endDate,
+            data: energy
+        };
     }
+    
+    
     
     return {apartmentInfo: await getApartmentInfo(id), lightmeters: await getLightmeters(id), energy : await calculateEnergy(await getLightmeters(id))}
 }
